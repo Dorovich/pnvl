@@ -123,7 +123,9 @@ static void pnvl_transfer_pages(PNVLDevice *dev)
 	do {
 		len = pnvl_dma_rx_page(dev);
 		ret = pnvl_proxy_tx_page(dev, dev->dma.buff, len);
-	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
+		if (ret == PNVL_FAILURE)
+			break;
+	} while (!pnvl_dma_is_finished(dev) && !pnvl_dma_need_handles(dev));
 
 	pnvl_dma_end_run(dev);
 	printf("DONE pnvl_transfer_pages (ret=%d)\n", ret);
@@ -142,7 +144,9 @@ static void pnvl_receive_pages(PNVLDevice *dev)
 	do {
 		len = pnvl_proxy_rx_page(dev, dev->dma.buff);
 		ret = pnvl_dma_tx_page(dev, len);
-	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
+		if (ret == PNVL_FAILURE)
+			break;
+	} while (!pnvl_dma_is_finished(dev) && !pnvl_dma_need_handles(dev));
 
 	pnvl_dma_end_run(dev);
 	printf("DONE pnvl_receive_pages (ret=%d)\n", ret);
@@ -164,7 +168,7 @@ void pnvl_execute(PNVLDevice *dev)
 		break;
 	case DMA_MODE_PASSIVE:
 		if (!dev->ret) {
-			pnvl_proxy_wait_and_handle_req(dev);
+			pnvl_proxy_await_req(dev, PNVL_REQ_SLN);
 			pnvl_receive_pages(dev);
 			dev->ret = true;
 		} else {

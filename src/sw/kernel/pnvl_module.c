@@ -45,32 +45,53 @@ static bool pnvl_copy_data(struct pnvl_dev *pnvl_dev, unsigned long arg)
 {
 	struct pnvl_data *kdata = &pnvl_dev->data;
 	struct pnvl_data __user *udata = (struct pnvl_data *)arg;
+	return (access_ok(udata, sizeof(*udata)) &&
+			!copy_from_user(kdata, udata, sizeof(*kdata)));
+}
 
-	if (!access_ok(udata, sizeof(*udata)))
-		return false;
-	if (copy_from_user(kdata, udata, sizeof(*kdata)) != 0)
-		return false;
+static bool pnvl_check_size_fit(struct pnvl_dev *pnvl_dev)
+{
+	void __iomem *mmio = pnvl_dev->bar.mmio;
+	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
+	return pnvl_dev->data.len <= len_avail;
+}
 
-	return true;
+static void pnvl_mode_active(struct pnvl_dev *pnvl_dev)
+{
+	pnvl_dev->dma.mode = PNVL_MODE_ACTIVE;
+	pnvl_dev->sending = true;
+	pnvl_dev->recving = false;
+}
+
+static void pnvl_mode_passive(struct pnvl_dev *pnvl_dev)
+{
+	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
+	pnvl_dev->sending = false;
+	pnvl_dev->recving = true;
+}
+
+static void pnvl_mode_off(struct pnvl_dev *pnvl_dev)
+{
+	pnvl_dev->dma.mode = -1;
+	pnvl_dev->sending = false;
+	pnvl_dev->recving = false;
 }
 
 static int pnvl_ioctl_send(struct pnvl_dev *pnvl_dev, unsigned long arg)
 {
-	int ret;
-
 	if (pnvl_dev->sending || pnvl_dev->recving)
 		return -EBUSY;
 	if (!pnvl_copy_data(pnvl_dev, arg))
 		return -EFAULT;
-	if(!pnvl_dma_check_size_avail(pnvl_dev))
+	if(!pnvl_check_size_fit(pnvl_dev))
 		return -EMSGSIZE;
 
-	pnvl_dma_mode_active(pnvl_dev);
+	pnvl_mode_active(pnvl_dev);
 	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
 		return -ENOMEM;
-	ret = pnvl_dma_get_handles(pnvl_dev);
-	if (ret < 0)
-		return ret;
+	if (pnvl_dma_get_handles(pnvl_dev) < 0)
+		return -ENOMEM;
+
 	pnvl_dma_write_params(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 
@@ -79,19 +100,17 @@ static int pnvl_ioctl_send(struct pnvl_dev *pnvl_dev, unsigned long arg)
 
 static int pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev, unsigned long arg)
 {
-	int ret;
-
 	if (pnvl_dev->sending || pnvl_dev->recving)
 		return -EBUSY;
 	if (!pnvl_copy_data(pnvl_dev, arg))
 		return -EFAULT;
 
-	pnvl_dma_mode_passive(pnvl_dev);
+	pnvl_mode_passive(pnvl_dev);
 	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
 		return -ENOMEM;
-	ret = pnvl_dma_get_handles(pnvl_dev);
-	if (ret < 0)
-		return ret;
+	if (pnvl_dma_get_handles(pnvl_dev) < 0)
+		return -ENOMEM;
+
 	pnvl_dma_write_params(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 	pnvl_dma_wait(pnvl_dev);
@@ -107,7 +126,7 @@ static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
 
 	pnvl_dma_wait(pnvl_dev);
 	pnvl_dma_dismantle(pnvl_dev);
-	pnvl_dma_mode_off(pnvl_dev);
+	pnvl_mode_off(pnvl_dev);
 
 	return 0;
 }
@@ -117,11 +136,11 @@ static int pnvl_ioctl_return(struct pnvl_dev *pnvl_dev)
 	if (!pnvl_dev->recving)
 		return -EINVAL;
 
-	pnvl_dma_mode_active(pnvl_dev);
+	pnvl_mode_active(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 	pnvl_dma_wait(pnvl_dev);
 	pnvl_dma_dismantle(pnvl_dev);
-	pnvl_dma_mode_off(pnvl_dev);
+	pnvl_mode_off(pnvl_dev);
 
 	return 0;
 }

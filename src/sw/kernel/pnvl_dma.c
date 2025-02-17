@@ -8,29 +8,61 @@
 #include "pnvl_module.h"
 #include <linux/dma-mapping.h>
 
-bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev)
+/* Beware of double evaluation of arguments */
+#define CMIN(a, b) ((a)<(b)?(a):(b))
+
+static dma_addr_t pnvl_dma_mru_handle(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
-	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
-	return pnvl_dev->data.len <= len_avail;
+	return (dma_addr_t)ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_MRU);
+}
+
+bool pnvl_dma_finished(struct pnvl_dev *pnvl_dev)
+{
+	void __iomem *mmio = pnvl_dev->bar.mmio;
+	return ioread32(mmio + PNVL_HW_BAR0_DMA_FINI);
+}
+
+void pnvl_dma_update_handles(struct pnvl_dev *pnvl_dev)
+{
+	struct pnvl_dma *dma = &pnvl_dev->dma;
+	void __iomem *mmio = pnvl_dev->bar.mmio;
+	size_t rem_hnds, ofs = sizeof(u32);
+	int last_pos_hnd = dma->pos_hnd;
+
+	iowrite32((u32)pnvl_dma_mru_handle(pnvl_dev),
+			mmio + PNVL_HW_BAR0_DMA_HANDLES);
+
+	rem_hnds = dma->npages - dma->pos_hnd;
+	dma->pos_hnd += CMIN(rem_hnds, PNVL_HW_BAR0_DMA_MAX_PAGES);
+	for (int i = last_pos_hnd; i < dma->pos_hnd; ++i) {
+		iowrite32((u32)dma->dma_handles[i],
+			mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
+		ofs += sizeof(u32);
+	}
 }
 
 int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 {
-	int first_page, last_page, npages, npages_pinned = 0;
+	int first_page, last_page, npages, pinned = 0;
 	struct pnvl_data *data = &pnvl_dev->data;
+	struct page **pages;
 
 	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
 	last_page = ((data->addr + data->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	npages = last_page - first_page + 1;
-	npages_pinned = pin_user_pages_fast(data->addr, npages,
-					FOLL_LONGTERM, pnvl_dev->dma.pages);
+	pages = kmalloc(npages * sizeof(*pages), GFP_KERNEL);
+	pinned = pin_user_pages_fast(data->addr, npages, FOLL_LONGTERM, pages);
+	if (pinned < npages)
+		goto err_dma_pin;
 
-	pnvl_dev->dma.offset = data->addr & ~PAGE_MASK;
+	pnvl_dev->dma.pages = pages;
 	pnvl_dev->dma.npages = npages;
-	pnvl_dev->dma.len = data->len;
+	return 0;
 
-	return npages_pinned - npages;
+err_dma_pin:
+	kfree(pages);
+	return -1;
 }
 
 int pnvl_dma_get_handles(struct pnvl_dev *pnvl_dev)
@@ -38,40 +70,37 @@ int pnvl_dma_get_handles(struct pnvl_dev *pnvl_dev)
 	struct pci_dev *pdev = pnvl_dev->pdev;
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	dma_addr_t *handles;
-	size_t len, len_map;
-	int err = 0;
+	size_t len, len_map, ofs;
 
-	handles = kmalloc(dma->npages * sizeof(dma_addr_t), GFP_KERNEL);
+	handles = kmalloc(dma->npages * sizeof(*handles), GFP_KERNEL);
 
-	len = dma->len;
-	len_map = PAGE_SIZE - dma->offset;
+	len = pnvl_dev->data.len;
+	ofs = pnvl_dev->data.addr & ~PAGE_MASK;
+	len_map = PAGE_SIZE - ofs;
 	if (len_map > len)
 		len_map = len;
 	len -= len_map;
-	handles[0] = dma_map_page(&pdev->dev, dma->pages[0], dma->offset,
-			len_map, dma->direction);
-	if (dma_mapping_error(&pdev->dev, handles[0])) {
-		err = -ENOMEM;
-		goto err_dma_map;
-	}
+	handles[0] = dma_map_page(&pdev->dev, dma->pages[0], ofs, len_map,
+			dma->direction);
+	if (dma_mapping_error(&pdev->dev, handles[0]))
+		goto err_dma_map_mem;
 
 	for (int i = 1; i < dma->npages; ++i) {
 		len_map = len > PAGE_SIZE ?  PAGE_SIZE : len;
 		len -= len_map;
 		handles[i] = dma_map_page(&pdev->dev, dma->pages[i], 0,
 				len_map, dma->direction);
-		if (dma_mapping_error(&pdev->dev, handles[i])) {
-			err = -ENOMEM;
-			goto err_dma_map;
-		}
+		if (dma_mapping_error(&pdev->dev, handles[i]))
+			goto err_dma_map_mem;
 	}
 
 	dma->dma_handles = handles;
+	dma->pos_hnd = 0;
 	return 0;
 
-err_dma_map:
+err_dma_map_mem:
 	kfree(handles);
-	return err;
+	return -ENOMEM;
 }
 
 void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev)
@@ -85,11 +114,12 @@ void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev)
 				mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 	}
 
-	iowrite32((u32)dma->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
+	iowrite32((u32)pnvl_dev->data.len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
 	iowrite32((u32)dma->npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
 
-	for (int i = 0; i < dma->npages; ++i) {
+	dma->pos_hnd = CMIN(dma->npages, PNVL_HW_BAR0_DMA_MAX_PAGES);
+	for (int i = 0; i < dma->pos_hnd; ++i) {
 		iowrite32((u32)dma->dma_handles[i],
 			mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
 		ofs += sizeof(u32);
@@ -102,36 +132,18 @@ void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
 	iowrite32(1, mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
 }
 
-void pnvl_dma_mode_active(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->dma.mode = PNVL_MODE_ACTIVE;
-	pnvl_dev->sending = true;
-	pnvl_dev->recving = false;
-}
-
-void pnvl_dma_mode_passive(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
-	pnvl_dev->sending = false;
-	pnvl_dev->recving = true;
-}
-
-void pnvl_dma_mode_off(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->dma.mode = -1;
-	pnvl_dev->sending = false;
-	pnvl_dev->recving = false;
-}
-
 void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 
 	for (int i = 0; i < dma->npages; ++i) {
 		dma_unmap_page(&pnvl_dev->pdev->dev, dma->dma_handles[i],
-			dma->len, dma->direction);
+			pnvl_dev->data.len, dma->direction);
 		unpin_user_page(dma->pages[i]);
 	}
+
+	kfree(dma->dma_handles);
+	kfree(dma->pages);
 }
 
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev)

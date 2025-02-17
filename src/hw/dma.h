@@ -25,6 +25,7 @@ typedef struct DMAConfig {
 	dma_size_t len_avail;
 	dma_mask_t mask;
 	size_t page_size;
+	/* dma_addr_t handle_mru; */
 	dma_addr_t handles[PNVL_HW_BAR0_DMA_HANDLES_CNT];
 	/* dma_addr_t *handles; */
 } DMAConfig;
@@ -66,6 +67,7 @@ int pnvl_dma_begin_run(PNVLDevice *dev);
 void pnvl_dma_end_run(PNVLDevice *dev);
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle);
 bool pnvl_dma_is_idle(PNVLDevice *dev);
+bool pnvl_dma_need_handles(PNVLDevice *dev);
 bool pnvl_dma_is_finished(PNVLDevice *dev);
 
 void pnvl_dma_reset(PNVLDevice *dev);

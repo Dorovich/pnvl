@@ -27,13 +27,12 @@ struct pnvl_bar {
 };
 
 struct pnvl_dma {
-	dma_addr_t *dma_handles;
-	size_t offset;
-	size_t len;
-	size_t npages;
 	int mode;
+	int pos_hnd;
 	enum dma_data_direction direction;
-	struct page *pages[PNVL_HW_BAR0_DMA_HANDLES_CNT];
+	size_t npages;
+	struct page **pages;
+	dma_addr_t *dma_handles;
 };
 
 struct pnvl_irq {
@@ -56,14 +55,12 @@ struct pnvl_dev {
 	struct cdev cdev;
 };
 
-bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev);
 int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev);
 int pnvl_dma_get_handles(struct pnvl_dev *pnvl_dev);
+bool pnvl_dma_finished(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_mode_active(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_mode_passive(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_mode_off(struct pnvl_dev *pnvl_dev);
+void pnvl_dma_update_handles(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wake(struct pnvl_dev *pnvl_dev);

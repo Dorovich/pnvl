@@ -64,18 +64,18 @@ size_t pnvl_dma_rx_page(PNVLDevice *dev)
 	len_want = MIN(dma->config.page_size, dma->current.len_left);
 
 	if (len_want <= len_have) {
-		//printf("DMA READ: %lu bytes @ %#010lx\n", len_want, addr);
+		printf("DMA READ: %lu bytes @ %#010lx\n", len_want, addr);
 		if (pci_dma_read(&dev->pci_dev, addr, dma->buff, len_want))
 			return PNVL_FAILURE;
 		addr += len_want;
 	} else {
-		//printf("DMA READ: %lu bytes @ %#010lx\n", len_have, addr);
+		printf("DMA READ: %lu bytes @ %#010lx\n", len_have, addr);
 		if (pci_dma_read(&dev->pci_dev, addr, dma->buff, len_have))
 			return PNVL_FAILURE;
 		addr = pnvl_dma_next_handle(dma);
 
 		size_t lofs = len_want - len_have;
-		//printf("DMA READ: %lu bytes @ %#010lx\n", lofs, addr);
+		printf("DMA READ: %lu bytes @ %#010lx\n", lofs, addr);
 		if (pci_dma_read(&dev->pci_dev, addr, dma->buff + len_have,
 					lofs))
 			return PNVL_FAILURE;
@@ -84,7 +84,7 @@ size_t pnvl_dma_rx_page(PNVLDevice *dev)
 
 	dma->current.addr = addr;
 	dma->current.len_left -= len_want;
-	//printf("DMA READ: %lu bytes left\n", dma->current.len_left);
+	printf("DMA READ: %lu bytes left\n", dma->current.len_left);
 	return len_want;
 }
 
@@ -103,18 +103,18 @@ int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in)
 	len_want = len_in;
 
 	if (len_want <= len_have) {
-		//printf("DMA WRITE: %lu bytes @ %#010lx\n", len_want, addr);
+		printf("DMA WRITE: %lu bytes @ %#010lx\n", len_want, addr);
 		if (pci_dma_write(&dev->pci_dev, addr, dma->buff, len_want))
 			return PNVL_FAILURE;
 		addr += len_want;
 	} else {
-		//printf("DMA WRITE: %lu bytes @ %#010lx\n", len_have, addr);
+		printf("DMA WRITE: %lu bytes @ %#010lx\n", len_have, addr);
 		if (pci_dma_write(&dev->pci_dev, addr, dma->buff, len_have))
 			return PNVL_FAILURE;
 		addr = pnvl_dma_next_handle(dma);
 
 		size_t lofs = len_want - len_have;
-		//printf("DMA WRITE: %lu bytes @ %#010lx\n", lofs, addr);
+		printf("DMA WRITE: %lu bytes @ %#010lx\n", lofs, addr);
 		if (pci_dma_write(&dev->pci_dev, addr, dma->buff + len_have,
 					lofs))
 			return PNVL_FAILURE;
@@ -123,18 +123,13 @@ int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in)
 
 	dma->current.addr = addr;
 	dma->current.len_left -= len_want;
-	//printf("DMA WRITE: %lu bytes left\n", dma->current.len_left);
+	printf("DMA WRITE: %lu bytes left\n", dma->current.len_left);
 	return PNVL_SUCCESS;
 }
 
 int pnvl_dma_begin_run(PNVLDevice *dev)
 {
 	DMAStatus status;
-
-	/*
-	if (!dev->dma.config.handles)
-		return PNVL_FAILURE;
-	*/
 
 	pnvl_dma_init_current(&dev->dma);
 	status = qatomic_cmpxchg(&dev->dma.status, DMA_STATUS_IDLE,
@@ -162,6 +157,11 @@ bool pnvl_dma_is_idle(PNVLDevice *dev)
 	return qatomic_read(&dev->dma.status) == DMA_STATUS_IDLE;
 }
 
+bool pnvl_dma_need_handles(PNVLDevice *dev)
+{
+	return dev->dma.current.hnd_pos + 1 == dev->dma.config.npages;
+}
+
 bool pnvl_dma_is_finished(PNVLDevice *dev)
 {
 	return dev->dma.current.len_left == 0;
@@ -177,17 +177,10 @@ void pnvl_dma_reset(PNVLDevice *dev)
 	memset(dma->buff, 0, PNVL_HW_DMA_AREA_SIZE);
 	memset(dma->config.handles, 0,
 			sizeof(dma_addr_t) * PNVL_HW_BAR0_DMA_HANDLES_CNT);
-	/*
-	if (dma->config.handles) {
-		free(dma->config.handles);
-		dma->config.handles = NULL;
-	}
-	*/
 }
 
 void pnvl_dma_init(PNVLDevice *dev, Error **errp)
 {
-	/* dev->dma.config.handles = NULL; */
 	pnvl_dma_reset(dev);
 	dev->dma.config.mask = DMA_BIT_MASK(PNVL_HW_DMA_ADDR_CAPABILITY);
 }
