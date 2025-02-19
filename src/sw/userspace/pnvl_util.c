@@ -83,7 +83,9 @@ struct context parse_args(int argc, char **argv)
 	/* PCI funciton number is always 0 for pnvl */
 	ctx.pci_func_nb = 0;
 
-	while ((op = getopt(argc, argv, "b:d:hr:s:v")) != -1) {
+	ctx.vec_len = 0;
+
+	while ((op = getopt(argc, argv, "b:d:hr:s:l:v")) != -1) {
 		switch (op) {
 		case 'b':
 			ctx.pci_bus_nb = strtol(optarg, &endptr, 10);
@@ -127,6 +129,14 @@ struct context parse_args(int argc, char **argv)
 				LOG_ERR("PCI device number (%u) out of"
 					"range ([0, %u])\n", ctx.pci_device_nb,
 					PCI_DEVICE_NUMBER_INVALID - 1);
+				exit(-1);
+			}
+			break;
+		case 'l':
+			ctx.vec_len = strtol(optarg, &endptr, 10);
+			if (errno != 0 || optarg == endptr) {
+				LOG_ERR("strtol: invalid value (%s) for"
+					"argument %c\n", optarg, op);
 				exit(-1);
 			}
 			break;

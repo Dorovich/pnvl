@@ -34,9 +34,10 @@
 #define PNVL_HW_BAR0_DMA_FINI 0x40
 #define PNVL_HW_BAR0_DMA_HANDLES 0x48
 
+/* 512 for a space of 2MB (if host PAGE_SIZE is 4KB) */
 #define PNVL_HW_BAR0_DMA_MAX_PAGES 512
 #define PNVL_HW_BAR0_DMA_MAX_LEN (PNVL_HW_BAR0_DMA_MAX_PAGES * PAGE_SIZE)
-/* 512 for a space of 2MB (if PAGE_SIZE is 4KB); 1 more if offset exists */
+/* if offset exists an extra handle may be needed */
 #define PNVL_HW_BAR0_DMA_HANDLES_CNT (PNVL_HW_BAR0_DMA_MAX_PAGES+1)
 
 #define PNVL_HW_BAR0_START PNVL_HW_BAR0_IRQ_0_RAISE

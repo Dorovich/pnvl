@@ -66,7 +66,7 @@ static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)
 		val = dev->dma.config.len_avail;
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_MRU:
-		val = dev->dma.current.addr;
+		val = dev->dma.current.addr_mru;
 		break;
 	case PNVL_HW_BAR0_DMA_FINI:
 		val = pnvl_dma_is_finished(dev);

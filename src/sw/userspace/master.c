@@ -14,8 +14,6 @@
 #include "sw/module/pnvl_ioctl.h"
 #include "pnvl_util.h"
 
-#define VEC_LEN 8000 //2000000
-
 static int offload_work(int fd, void *addr, size_t len)
 {
 	struct timeval t1, t2, t3;
@@ -64,10 +62,13 @@ int main(int argc, char **argv)
 	int *data;
 	size_t data_len;
 
+	if (!ctx.vec_len)
+		return -2;
+
 	if (open_pnvl_dev(&ctx) < 0)
 		return -1;
 
-	data_len = VEC_LEN * sizeof(int);
+	data_len = ctx.vec_len * sizeof(int);
 	data = malloc(data_len);
 	memset(data, 0, data_len);
 

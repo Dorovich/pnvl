@@ -2,7 +2,8 @@
 
 loopdev="/dev/loop24"
 loopdev_part="/dev/loop24p1"
-dir="part1"
+point="${HOME}/src/proto-nvlink/vm/part1"
+code="${HOME}/src/proto-nvlink/src/sw"
 
 [ -z $IMG ] && echo "Usage:\tIMG=<file.img> <command>" && exit 1
 
@@ -12,15 +13,15 @@ while getopts "iur" opt; do
 	case "$opt" in
 		i)
 			sudo losetup -P $loopdev $IMG
-			sudo mount $loopdev_part $dir
+			sudo mount $loopdev_part $point
 			;;
 		u)
-			sudo cp ${HOME}/src/proto-nvlink/src/sw/kernel/pnvl.ko $dir
-			sudo cp ${HOME}/src/proto-nvlink/src/sw/userspace/master $dir
-			sudo cp ${HOME}/src/proto-nvlink/src/sw/userspace/chiplet $dir
+			sudo cp $code/kernel/pnvl.ko $point
+			sudo cp $code/userspace/master $point
+			sudo cp $code/userspace/chiplet $point
 			;;
 		r)
-			sudo umount $dir
+			sudo umount $point
 			sudo losetup -d $loopdev
 			;;
 	esac

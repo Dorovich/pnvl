@@ -14,6 +14,7 @@ struct context {
 	uint16_t pci_bus_nb;	/* PCI bus number of device (8 bits)  */
 	uint8_t pci_device_nb;	/* PCI device number of device (5 bits) */
 	uint8_t pci_func_nb;	/* PCI function number of device (3 bits) */
+	size_t vec_len;		/* number of integers to transmit */
 };
 
 void usage(FILE * fd, char **argv);

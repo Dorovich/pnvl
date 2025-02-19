@@ -25,14 +25,13 @@ typedef struct DMAConfig {
 	dma_size_t len_avail;
 	dma_mask_t mask;
 	size_t page_size;
-	/* dma_addr_t handle_mru; */
 	dma_addr_t handles[PNVL_HW_BAR0_DMA_HANDLES_CNT];
-	/* dma_addr_t *handles; */
 } DMAConfig;
 
 typedef struct DMACurrent {
 	dma_size_t len_left;
-	dma_addr_t addr;
+	dma_addr_t addr_mru;
+	dma_addr_t addr_next;
 	int hnd_pos;
 } DMACurrent;
 

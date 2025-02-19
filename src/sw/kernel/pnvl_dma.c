@@ -23,6 +23,7 @@ bool pnvl_dma_finished(struct pnvl_dev *pnvl_dev)
 	return ioread32(mmio + PNVL_HW_BAR0_DMA_FINI);
 }
 
+/*
 void pnvl_dma_update_handles(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
@@ -34,12 +35,31 @@ void pnvl_dma_update_handles(struct pnvl_dev *pnvl_dev)
 			mmio + PNVL_HW_BAR0_DMA_HANDLES);
 
 	rem_hnds = dma->npages - dma->pos_hnd;
-	dma->pos_hnd += CMIN(rem_hnds, PNVL_HW_BAR0_DMA_MAX_PAGES);
+	dma->pos_hnd += CMIN(rem_hnds, PNVL_HW_BAR0_DMA_HANDLES_CNT);
 	for (int i = last_pos_hnd; i < dma->pos_hnd; ++i) {
 		iowrite32((u32)dma->dma_handles[i],
 			mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
 		ofs += sizeof(u32);
 	}
+}
+*/
+
+void pnvl_dma_update_handles(struct pnvl_dev *pnvl_dev)
+{
+	struct pnvl_dma *dma = &pnvl_dev->dma;
+	void __iomem *mmio = pnvl_dev->bar.mmio;
+	size_t ofs = 0;
+	int start = dma->pos_hnd;
+	int end = start + CMIN(dma->npages - dma->pos_hnd,
+			PNVL_HW_BAR0_DMA_HANDLES_CNT);
+
+	for (int i = start; i < end; ++i) {
+		iowrite32((u32)dma->dma_handles[i],
+			mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
+		ofs += sizeof(u32);
+	}
+
+	dma->pos_hnd = end;
 }
 
 int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
@@ -118,7 +138,7 @@ void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev)
 	iowrite32((u32)dma->npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
 
-	dma->pos_hnd = CMIN(dma->npages, PNVL_HW_BAR0_DMA_MAX_PAGES);
+	dma->pos_hnd = CMIN(dma->npages, PNVL_HW_BAR0_DMA_HANDLES_CNT);
 	for (int i = 0; i < dma->pos_hnd; ++i) {
 		iowrite32((u32)dma->dma_handles[i],
 			mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);

@@ -30,7 +30,6 @@ typedef struct PNVLDeviceClass {
 
 typedef struct PNVLDevice {
 	PCIDevice pci_dev;
-	bool ret; // return results in passive mode
 	IRQStatus irq;
 	DMAEngine dma;
 	MemoryRegion mmio;
