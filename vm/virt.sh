@@ -22,7 +22,8 @@ while getopts "dsp:" opt; do
 done
 shift $((OPTIND-1))
 
-qemu-system-riscv64 \
+#qemu-system-riscv64 \
+~/src/proto-nvlink/qemu/build/qemu-system-riscv64 \
 	-machine virt \
 	-cpu rv64 \
 	-m 256M \

@@ -30,7 +30,6 @@ typedef struct DMAConfig {
 
 typedef struct DMACurrent {
 	dma_size_t len_left;
-	dma_addr_t addr_mru;
 	dma_addr_t addr_next;
 	int hnd_pos;
 } DMACurrent;
@@ -59,8 +58,8 @@ typedef struct DMAEngine {
  * ============================================================================
  */
 
-size_t pnvl_dma_rx_page(PNVLDevice *dev);
-int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in);
+int pnvl_dma_rx_page(PNVLDevice *dev);
+int pnvl_dma_tx_page(PNVLDevice *dev, int len_want);
 
 int pnvl_dma_begin_run(PNVLDevice *dev);
 void pnvl_dma_end_run(PNVLDevice *dev);

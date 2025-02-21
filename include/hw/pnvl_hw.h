@@ -35,6 +35,8 @@
 		PNVL_FLAG_RST|PNVL_FLAG_RET|PNVL_FLAG_SKP)
 /* when to stop transaction */
 #define PNVL_FLAGS_EXIT (PNVL_FLAG_FIN|PNVL_FLAG_UPD)
+/* request for handle update */
+#define PNVL_FLAGS_NEED (PNVL_FLAG_UPD|PNVL_FLAG_SPC)
 
 /* ============================================================================
  * MMIO

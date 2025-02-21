@@ -112,8 +112,7 @@ type_init(pnvl_register_types)
 
 static void pnvl_transfer_pages(PNVLDevice *dev)
 {
-	int ret;
-	size_t len;
+	int ret, len;
 
 	printf("BEGIN pnvl_transfer_pages\n");
 	if (pnvl_dma_begin_run(dev) < 0)
@@ -132,8 +131,7 @@ static void pnvl_transfer_pages(PNVLDevice *dev)
 
 static void pnvl_receive_pages(PNVLDevice *dev)
 {
-	int ret;
-	size_t len;
+	int ret, len;
 
 	printf("BEGIN pnvl_receive_pages\n");
 	if (pnvl_dma_begin_run(dev) < 0)

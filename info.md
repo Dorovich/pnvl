@@ -9,3 +9,7 @@
 - Longitudes arbitrarias de datos (¿loop en el driver?).
 - Micro-benchmarks (gettimeofday) en el codigo de usuario. DONE
 - Adaptar matrix-multiply (preguntar por el codigo a Xavi).
+
+# pistas
+
+ver dma.c línea 37: len_left puede que se actualize incorrectamente despues de volver de añadir nuevos handles.

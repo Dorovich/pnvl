@@ -45,8 +45,8 @@ typedef struct PNVLProxy {
  * ============================================================================
  */
 
-size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff);
-int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, size_t len);
+int pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff);
+int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, int len);
 
 bool pnvl_proxy_get_mode(Object *obj, Error **errp);
 void pnvl_proxy_set_mode(Object *obj, bool mode, Error **errp);
