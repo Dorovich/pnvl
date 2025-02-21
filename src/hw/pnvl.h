@@ -34,6 +34,7 @@ typedef struct PNVLDevice {
 	DMAEngine dma;
 	MemoryRegion mmio;
 	PNVLProxy proxy;
+	unsigned int flags;
 } PNVLDevice;
 
 

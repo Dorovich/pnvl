@@ -93,6 +93,7 @@ static int pnvl_ioctl_send(struct pnvl_dev *pnvl_dev, unsigned long arg)
 		return -ENOMEM;
 
 	pnvl_dma_write_params(pnvl_dev);
+	pnvl_dma_update_handles(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 
 	return 0;
@@ -112,6 +113,7 @@ static int pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev, unsigned long arg)
 		return -ENOMEM;
 
 	pnvl_dma_write_params(pnvl_dev);
+	pnvl_dma_update_handles(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 	pnvl_dma_wait(pnvl_dev);
 	pnvl_dma_dismantle(pnvl_dev);

@@ -49,6 +49,9 @@ static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)
 		goto mmio_read_end;
 
 	switch(addr) {
+	case PNVL_HW_BAR0_FLAGS:
+		val = dev->flags;
+		break;
 	case PNVL_HW_BAR0_DMA_CFG_LEN:
 		val = dev->dma.config.len;
 		break;
@@ -64,12 +67,6 @@ static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)
 			pnvl_proxy_await_req(dev, PNVL_REQ_RLN);
 		}
 		val = dev->dma.config.len_avail;
-		break;
-	case PNVL_HW_BAR0_DMA_CFG_MRU:
-		val = dev->dma.current.addr_mru;
-		break;
-	case PNVL_HW_BAR0_DMA_FINI:
-		val = pnvl_dma_is_finished(dev);
 		break;
 	}
 
@@ -95,6 +92,9 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 		break;
 	case PNVL_HW_BAR0_IRQ_0_LOWER:
 		pnvl_irq_lower(dev, 0);
+		break;
+	case PNVL_HW_BAR0_FLAGS:
+		dev->flags = val;
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_LEN:
 		dma->config.len = val;

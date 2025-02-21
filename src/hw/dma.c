@@ -29,25 +29,8 @@ static inline dma_addr_t pnvl_dma_mask(DMAEngine *dma, dma_addr_t addr)
 static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
 {
 	return (PNVL_HW_DMA_AREA_START <= addr &&
-		addr <= PNVL_HW_DMA_AREA_START + PNVL_HW_DMA_AREA_SIZE);
+			addr <= PNVL_HW_DMA_AREA_START + PNVL_HW_DMA_AREA_SIZE);
 }
-
-/*
-static inline dma_addr_t pnvl_dma_next_handle(DMAEngine *dma)
-{
-	if (dma->current.hnd_pos == PNVL_HW_BAR0_DMA_HANDLES_CNT)
-		return PNVL_FAILURE;
-	return dma->config.handles[++dma->current.hnd_pos];
-}
-
-static inline int pnvl_dma_next_handle(DMAEngine *dma, dma_addr_t *addr)
-{
-	if (dma->current.hnd_pos == PNVL_HW_BAR0_DMA_HANDLES_CNT)
-		return PNVL_FAILURE;
-	*addr = dma->config.handles[++dma->current.hnd_pos];
-	return PNVL_SUCCESS;
-}
-*/
 
 static inline void pnvl_dma_init_current(DMAEngine *dma)
 {
@@ -57,17 +40,21 @@ static inline void pnvl_dma_init_current(DMAEngine *dma)
 	dma->current.hnd_pos = 0;
 }
 
-static inline int pnvl_dma_read(PNVLDevice *dev, dma_addr_t addr, size_t len,
-		size_t ofs)
+static inline int pnvl_dma_read(PNVLDevice *dev, dma_addr_t addr,
+		dma_size_t len, dma_size_t ofs)
 {
 	printf("DMA RD: %lu bytes @ %#010lx\n", len, addr);
+	if (len > dev->dma.config.page_size)
+		return PNVL_FAILURE;
 	return pci_dma_read(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
 }
 
-static inline int pnvl_dma_write(PNVLDevice *dev, dma_addr_t addr, size_t len,
-		size_t ofs)
+static inline int pnvl_dma_write(PNVLDevice *dev, dma_addr_t addr,
+		dma_size_t len, dma_size_t ofs)
 {
 	printf("DMA WR: %lu bytes @ %#010lx\n", len, addr);
+	if (len > dev->dma.config.page_size)
+		return PNVL_FAILURE;
 	return pci_dma_write(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
 }
 
@@ -98,6 +85,8 @@ size_t pnvl_dma_rx_page(PNVLDevice *dev)
 		cur->len_left -= len_want;
 		cur->addr_mru = addr;
 		cur->addr_next = addr + len_want;
+		if (!cur->len_left)
+			dev->flags |= PNVL_FLAG_FIN;
 
 		return len_want;
 	}
@@ -107,8 +96,10 @@ size_t pnvl_dma_rx_page(PNVLDevice *dev)
 
 	cur->len_left -= len_have;
 	cur->addr_mru = addr;
-	if (cur->hnd_pos == PNVL_HW_BAR0_DMA_HANDLES_CNT)
+	if (cur->hnd_pos == PNVL_HW_BAR0_DMA_HANDLES_CNT) {
+		dev->flags |= (PNVL_FLAG_SPC|PNVL_FLAG_UPD);
 		return len_have;
+	}
 	addr = dma->config.handles[++cur->hnd_pos];
 	cur->addr_next = addr;
 
@@ -118,6 +109,8 @@ size_t pnvl_dma_rx_page(PNVLDevice *dev)
 	cur->len_left -= len_want - len_have;
 	cur->addr_mru = addr;
 	cur->addr_next = addr + len_want - len_have;
+	if (!cur->len_left)
+		dev->flags |= PNVL_FLAG_FIN;
 
 	return len_want;
 }
@@ -143,8 +136,10 @@ int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_want)
 		cur->len_left -= len_want;
 		cur->addr_mru = addr;
 		cur->addr_next = addr + len_want;
+		if (!cur->len_left)
+			dev->flags |= PNVL_FLAG_FIN;
 
-		return len_want;
+		return PNVL_SUCCESS;
 	}
 
 	if (pnvl_dma_write(dev, addr, len_have, 0) < 0)
@@ -152,8 +147,10 @@ int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_want)
 
 	cur->len_left -= len_have;
 	cur->addr_mru = addr;
-	if (cur->hnd_pos == PNVL_HW_BAR0_DMA_HANDLES_CNT)
-		return len_have;
+	if (cur->hnd_pos == PNVL_HW_BAR0_DMA_HANDLES_CNT) {
+		dev->flags |= (PNVL_FLAG_SPC|PNVL_FLAG_UPD);
+		return PNVL_SUCCESS;
+	}
 	addr = dma->config.handles[++cur->hnd_pos];
 	cur->addr_next = addr;
 
@@ -163,8 +160,10 @@ int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_want)
 	cur->len_left -= len_want - len_have;
 	cur->addr_mru = addr;
 	cur->addr_next = addr + len_want - len_have;
+	if (!cur->len_left)
+		dev->flags |= PNVL_FLAG_FIN;
 
-	return len_want;
+	return PNVL_SUCCESS;
 }
 
 int pnvl_dma_begin_run(PNVLDevice *dev)
@@ -204,7 +203,7 @@ bool pnvl_dma_need_handles(PNVLDevice *dev)
 
 bool pnvl_dma_is_finished(PNVLDevice *dev)
 {
-	return dev->dma.current.len_left == 0;
+	return !dev->dma.current.len_left;
 }
 
 void pnvl_dma_reset(PNVLDevice *dev)

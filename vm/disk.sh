@@ -1,7 +1,7 @@
 #!/bin/sh
 
-loopdev="/dev/loop24"
-loopdev_part="/dev/loop24p1"
+loopdev="/dev/loop25"
+loopdev_part="/dev/loop25p1"
 point="${HOME}/src/proto-nvlink/vm/part1"
 code="${HOME}/src/proto-nvlink/src/sw"
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 server=off
-port=9993
+port=9994
 disk="vda-cli.img"
 name="Linux 6.6.72 on riscv64 PNVL-client"
 

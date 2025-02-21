@@ -11,6 +11,7 @@
 /* Beware of double evaluation of arguments */
 #define CMIN(a, b) ((a)<(b)?(a):(b))
 
+/*
 static dma_addr_t pnvl_dma_mru_handle(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
@@ -23,7 +24,6 @@ bool pnvl_dma_finished(struct pnvl_dev *pnvl_dev)
 	return ioread32(mmio + PNVL_HW_BAR0_DMA_FINI);
 }
 
-/*
 void pnvl_dma_update_handles(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
@@ -60,6 +60,29 @@ void pnvl_dma_update_handles(struct pnvl_dev *pnvl_dev)
 	}
 
 	dma->pos_hnd = end;
+}
+
+void pnvl_dma_handle_flags(struct pnvl_dev *pnvl_dev)
+{
+	void __iomem *mmio = pnvl_dev->bar.mmio;
+	u32 flags = ioread32(mmio + PNVL_HW_BAR0_FLAGS);
+
+	if (flags & PNVL_FLAG_UPD) {
+		flags &= !PNVL_FLAG_UPD;
+		iowrite32(flags, mmio + PNVL_HW_BAR0_FLAGS);
+		pnvl_dma_update_handles(pnvl_dev);
+		pnvl_dma_doorbell_ring(pnvl_dev);
+	} else if (flags & PNVL_FLAG_RST) {
+		flags &= !PNVL_FLAG_RST;
+		iowrite32(flags, mmio + PNVL_HW_BAR0_FLAGS);
+		pnvl_dev->dma.pos_hnd = 0;
+		pnvl_dma_update_handles(pnvl_dev);
+		pnvl_dma_doorbell_ring(pnvl_dev);
+	} else if (flags & PNVL_FLAG_FIN) {
+		flags = pnvl_dev->recving ? PNVL_FLAG_RET : 0;
+		iowrite32(flags, mmio + PNVL_HW_BAR0_FLAGS);
+		pnvl_dma_wake(pnvl_dev);
+	}
 }
 
 int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
@@ -127,23 +150,16 @@ void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	void __iomem *mmio = pnvl_dev->bar.mmio;
-	size_t ofs = 0;
 
 	if (dma->mode == PNVL_MODE_PASSIVE) {
 		iowrite32((u32)pnvl_dev->data.len,
 				mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 	}
 
+	iowrite32((u32)0, mmio + PNVL_HW_BAR0_FLAGS);
 	iowrite32((u32)pnvl_dev->data.len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
 	iowrite32((u32)dma->npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
-
-	dma->pos_hnd = CMIN(dma->npages, PNVL_HW_BAR0_DMA_HANDLES_CNT);
-	for (int i = 0; i < dma->pos_hnd; ++i) {
-		iowrite32((u32)dma->dma_handles[i],
-			mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
-		ofs += sizeof(u32);
-	}
 }
 
 void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
