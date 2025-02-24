@@ -41,5 +41,6 @@ linux-*/
 busybox-*/
 
 # qemu vm
-vm/*.img
+vm/vda-cli.img
+vm/vdb.img
 vm/part*

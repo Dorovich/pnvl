@@ -55,21 +55,22 @@ int main(int argc, char **argv)
 {
 	struct context ctx = parse_args(argc, argv);
 	int *data;
-	size_t data_len;
 
 	if (!ctx.vec_len)
-		return -2;
+		return -1;
 
 	if (open_pnvl_dev(&ctx) < 0)
-		return -1;
+		return -2;
 
-	data_len = ctx.vec_len * sizeof(int);
-	data = malloc(data_len);
-	memset(data, 0, data_len);
-
-	if (handle_work(ctx.fd, data, data_len)) {
+	data = calloc(ctx.vec_len, sizeof(int));
+	if (!data) {
 		close(ctx.fd);
-		return -1;
+		return -3;
+	}
+
+	if (handle_work(ctx.fd, data, ctx.vec_len * sizeof(int))) {
+		close(ctx.fd);
+		return -4;
 	}
 
 	close(ctx.fd);
