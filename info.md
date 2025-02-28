@@ -10,6 +10,8 @@
 - Micro-benchmarks (gettimeofday) en el codigo de usuario. DONE
 - Adaptar matrix-multiply (preguntar por el codigo a Xavi).
 
+- En vez de 1 pagina (4096 B) de handles en el dispositivo, tener 1 MB, que dará para más longitud, y que el programador se preocupe de gestionar ese espacio.
+
 # pistas
 
 ver dma.c línea 37: len_left puede que se actualize incorrectamente despues de volver de añadir nuevos handles.
